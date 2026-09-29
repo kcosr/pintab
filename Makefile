@@ -1,0 +1,63 @@
+# PinTab build, test, packaging and install. Command Line Tools are sufficient; Xcode is optional.
+
+APP_NAME    := PinTab
+BUNDLE_ID   := dev.local.PinTab
+VERSION     := 0.1.0
+BUILD_DIR   := build
+APP_BUNDLE  := $(BUILD_DIR)/$(APP_NAME).app
+INSTALL_DIR := $(HOME)/Applications
+# "-" is an ad-hoc signature. Set SIGN_IDENTITY to a self-signed certificate name to keep a stable
+# identity across rebuilds (only matters if a privacy permission is ever required).
+SIGN_IDENTITY ?= -
+
+# With only Command Line Tools installed, swift-testing lives outside the default search paths.
+# (Passing these flags from Package.swift instead silently runs zero tests.)
+DEV_DIR := $(shell xcode-select -p 2>/dev/null)
+ifeq ($(DEV_DIR),/Library/Developer/CommandLineTools)
+TEST_FLAGS := -Xswiftc -F -Xswiftc $(DEV_DIR)/Library/Developer/Frameworks \
+              -Xlinker -rpath -Xlinker $(DEV_DIR)/Library/Developer/Frameworks \
+              -Xlinker -rpath -Xlinker $(DEV_DIR)/Library/Developer/usr/lib
+endif
+
+.PHONY: all build release test app icon install uninstall run logs clean
+
+all: app
+
+build:
+	swift build
+
+release:
+	swift build -c release
+
+test:
+	swift test $(TEST_FLAGS)
+
+app: release
+	APP_NAME=$(APP_NAME) BUNDLE_ID=$(BUNDLE_ID) VERSION=$(VERSION) SIGN_IDENTITY="$(SIGN_IDENTITY)" \
+		scripts/make-app.sh "$$(swift build -c release --show-bin-path)/$(APP_NAME)" "$(APP_BUNDLE)"
+
+icon:
+	swift scripts/make-icon.swift
+
+install: app
+	-@pkill -x $(APP_NAME) && sleep 0.5 || true
+	mkdir -p "$(INSTALL_DIR)"
+	rm -rf "$(INSTALL_DIR)/$(APP_NAME).app"
+	ditto "$(APP_BUNDLE)" "$(INSTALL_DIR)/$(APP_NAME).app"
+	@echo "Installed $(INSTALL_DIR)/$(APP_NAME).app"
+	open "$(INSTALL_DIR)/$(APP_NAME).app"
+
+uninstall:
+	-@pkill -x $(APP_NAME) || true
+	rm -rf "$(INSTALL_DIR)/$(APP_NAME).app"
+	@echo "Removed the app. Settings remain; delete them with: defaults delete $(BUNDLE_ID)"
+
+run: app
+	-@pkill -x $(APP_NAME) && sleep 0.5 || true
+	open "$(APP_BUNDLE)"
+
+logs:
+	/usr/bin/log stream --level debug --style compact --predicate 'subsystem == "$(BUNDLE_ID)"'
+
+clean:
+	rm -rf .build $(BUILD_DIR)
