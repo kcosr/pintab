@@ -16,6 +16,7 @@ enum Metrics {
     static let emptyRowWidth: CGFloat = 250
     static let nameGap: CGFloat = 8
     static let nameHeight: CGFloat = 28
+    static let buttonGap: CGFloat = 6
     /// Transparent margin around the switching layout so the glass shadows are not clipped.
     static let shadowMargin: CGFloat = 44
 
@@ -61,6 +62,9 @@ final class SwitcherViewModel {
     @ObservationIgnored var onClick: (AppID) -> Void = { _ in }
     @ObservationIgnored var onManage: () -> Void = {}
     @ObservationIgnored var onPause: () -> Void = {}
+    @ObservationIgnored var onHandOff: () -> Void = {}
+    /// Whether the ⌘ button (hand this hold to the macOS switcher) is offered.
+    var canHandOff = false
     @ObservationIgnored var onDone: () -> Void = {}
 
     var selectedName: String? {
@@ -91,23 +95,33 @@ private struct SwitchingView: View {
         VStack(spacing: Metrics.nameGap) {
             bubbleContent
                 .frame(width: model.bubbleWidth, height: Metrics.bubbleHeight)
-            // Below the bubble, floating on the transparent window: Pause at the left edge, the selected
-            // app's name in the middle, and Manage at the right edge.
+            // Below the bubble, floating on the transparent window: the macOS-switcher hand-off (⌘Tab mode
+            // only) at the left edge, the selected app's name centred, Pause and Manage at the right edge.
             ZStack {
                 if let name = model.selectedName {
                     NameLabel(name: name)
-                        .padding(.horizontal, Metrics.nameHeight + 6)
+                        .padding(.horizontal, sideWidth + Metrics.buttonGap)
                 }
-                HStack {
-                    CircleButton(systemImage: "pause.fill", size: 11,
-                                 label: "Pause PinTab and use the macOS switcher", action: model.onPause)
+                HStack(spacing: Metrics.buttonGap) {
+                    if model.canHandOff {
+                        CircleButton(systemImage: "command", size: 12,
+                                     label: "Use the macOS switcher this time", action: model.onHandOff)
+                    }
                     Spacer(minLength: 0)
+                    CircleButton(systemImage: "pause.fill", size: 11,
+                                 label: "Pause PinTab", action: model.onPause)
                     CircleButton(systemImage: "ellipsis", size: 13, label: "Manage pinned apps", action: model.onManage)
                 }
             }
-            .frame(width: max(model.bubbleWidth, 200), height: Metrics.nameHeight)
+            .frame(width: max(model.bubbleWidth, 280), height: Metrics.nameHeight)
         }
         .padding(Metrics.shadowMargin)
+    }
+
+    /// Width of the wider button group (Pause and Manage, on the right), kept clear on both sides so
+    /// the name stays centred.
+    private var sideWidth: CGFloat {
+        2 * Metrics.nameHeight + Metrics.buttonGap
     }
 
     @ViewBuilder

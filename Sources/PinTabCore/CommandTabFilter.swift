@@ -51,6 +51,9 @@ public struct CommandTabFilter: Sendable {
     public let shortcut: Shortcut
     /// Keys whose key-down was swallowed and whose key-up has not been seen yet.
     private var swallowedKeys: Set<UInt16> = []
+    /// Set by handOff() until the shortcut's modifiers are released: for the rest of that hold,
+    /// PinTab steps aside so the macOS switcher gets ⌘Tab.
+    public private(set) var isHandingOff = false
 
     public init(shortcut: Shortcut = .commandTab) {
         self.shortcut = shortcut
@@ -59,6 +62,14 @@ public struct CommandTabFilter: Sendable {
     public mutating func decide(
         _ kind: TapEventKind, keyCode: UInt16, modifiers: KeyModifiers, isRepeat: Bool, phase: TapPhase
     ) -> TapDecision {
+        // The ⌘ release ends a hand-off, so the next ⌘Tab is PinTab's again. Only modifier changes count:
+        // keystrokes posted by other apps may carry flags without ⌘ while it is physically held. A
+        // release the tap never sees (secure input can hide it) is caught by the owner's state check.
+        if kind == .flagsChanged, isHandingOff, !modifiers.isSuperset(of: shortcut.modifiers) {
+            isHandingOff = false
+        }
+        // While handing off, behave exactly as if suspended (key-up hygiene still applies).
+        let phase = isHandingOff ? .suspended : phase
         switch kind {
         case .flagsChanged:
             guard phase == .switching else { return .pass }
@@ -72,8 +83,34 @@ public struct CommandTabFilter: Sendable {
         }
     }
 
-    /// Forgets which key-downs were swallowed (for example after the tap is re-created).
+    /// Steps aside until the shortcut's modifiers are released, so presses during the current hold
+    /// reach the macOS switcher.
+    public mutating func handOff() {
+        isHandingOff = true
+    }
+
+    /// Ends a hand-off early, when the modifiers were seen released some other way (a state check).
+    public mutating func endHandOff() {
+        isHandingOff = false
+    }
+
+    /// Whether PinTab swallowed a key-down whose key-up hasn't arrived yet. While true, removing the
+    /// tap would let that key-up (and any repeats) reach other apps.
+    public var ownsKeys: Bool { !swallowedKeys.isEmpty }
+
+    /// The keys PinTab swallowed and still owns, so the owner can check whether they are physically held.
+    public var ownedKeys: Set<UInt16> { swallowedKeys }
+
+    /// Forgets which key-downs were swallowed and ends any hand-off (for example after the tap is
+    /// re-created).
     public mutating func reset() {
+        forgetKeys()
+        isHandingOff = false
+    }
+
+    /// Forgets swallowed key-downs only (after the tap was briefly off and may have missed key-ups). An
+    /// active hand-off continues until ⌘ is released, so a macOS switcher already open stays in charge.
+    public mutating func forgetKeys() {
         swallowedKeys.removeAll()
     }
 
