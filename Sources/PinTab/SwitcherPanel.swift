@@ -5,6 +5,9 @@ import SwiftUI
 /// modifier changes) without activating PinTab, so the origin app stays active.
 final class SwitcherPanel: NSPanel {
     let hostingView: NSHostingView<SwitcherRootView>
+    /// Glass behind the icon row (switching) or the whole editor (managing). Content outside it,
+    /// such as the floating name pill, sits on the transparent window.
+    private let bubble = SwitcherPanel.makeBubble()
 
     init(model: SwitcherViewModel) {
         hostingView = NSHostingView(rootView: SwitcherRootView(model: model))
@@ -29,7 +32,17 @@ final class SwitcherPanel: NSPanel {
 
         // Intrinsic size lets fittingSize report the SwiftUI content size; with [] it reports zero.
         hostingView.sizingOptions = [.intrinsicContentSize]
-        contentView = Self.makeBackground(containing: hostingView)
+        let container = NSView()
+        container.addSubview(bubble)
+        hostingView.autoresizingMask = [.width, .height]
+        container.addSubview(hostingView)
+        contentView = container
+    }
+
+    /// Positions the glass, in window content coordinates (origin at the bottom left).
+    func setBubbleFrame(_ frame: NSRect) {
+        bubble.frame = frame
+        hostingView.frame = contentView?.bounds ?? .zero
     }
 
     override var canBecomeKey: Bool { true }
@@ -37,12 +50,10 @@ final class SwitcherPanel: NSPanel {
 
     /// Liquid Glass on macOS 26; a behind-window blur material on earlier versions. Both honour
     /// Reduce Transparency automatically.
-    private static func makeBackground(containing content: NSView) -> NSView {
-        content.autoresizingMask = [.width, .height]
+    private static func makeBubble() -> NSView {
         if #available(macOS 26.0, *) {
             let glass = NSGlassEffectView()
             glass.cornerRadius = Metrics.cornerRadius
-            glass.contentView = content
             return glass
         }
         let effect = NSVisualEffectView()
@@ -50,8 +61,6 @@ final class SwitcherPanel: NSPanel {
         effect.blendingMode = .behindWindow
         effect.state = .active
         effect.maskImage = roundedMask(radius: Metrics.cornerRadius)
-        content.frame = effect.bounds
-        effect.addSubview(content)
         return effect
     }
 

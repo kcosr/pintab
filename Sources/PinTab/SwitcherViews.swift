@@ -9,7 +9,15 @@ enum Metrics {
     static let tileSpacing: CGFloat = 6
     static var tileSize: CGFloat { icon + tilePadding * 2 }
     static let panelPadding: CGFloat = 18
-    static let minSwitchWidth: CGFloat = 280
+
+    /// Switching: the glass bubble holds only the icon row; the name floats in a pill below it.
+    static let bubblePadding: CGFloat = 12
+    static var bubbleHeight: CGFloat { tileSize + bubblePadding * 2 }
+    static let emptyRowWidth: CGFloat = 250
+    static let nameGap: CGFloat = 8
+    static let nameHeight: CGFloat = 28
+    /// Transparent margin around the switching layout so the glass shadows are not clipped.
+    static let shadowMargin: CGFloat = 44
 
     static let manageIcon: CGFloat = 52
     static let manageTileWidth: CGFloat = 104
@@ -42,8 +50,10 @@ final class SwitcherViewModel {
     var shortcutLabel: String = ""
     /// Width of the scrolling icon row (switching) or grid (managing).
     var rowWidth: CGFloat = 0
-    /// Overall content width, at least as wide as the row.
-    var contentWidth: CGFloat = Metrics.minSwitchWidth
+    /// Managing: overall content width, at least as wide as the grid.
+    var contentWidth: CGFloat = Metrics.minManageWidth
+    /// Switching: width of the glass bubble around the icon row.
+    var bubbleWidth: CGFloat = Metrics.emptyRowWidth
     var columns: Int = 1
     var gridHeight: CGFloat = 0
 
@@ -77,53 +87,113 @@ private struct SwitchingView: View {
     let model: SwitcherViewModel
 
     var body: some View {
-        VStack(spacing: 12) {
-            if model.tiles.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "pin.slash")
-                        .font(.system(size: 28, weight: .regular))
-                        .foregroundStyle(.secondary)
-                        .accessibilityHidden(true)
-                    Text(model.message ?? "No pinned apps are running")
-                        .font(.system(size: 15, weight: .medium))
+        VStack(spacing: Metrics.nameGap) {
+            bubbleContent
+                .frame(width: model.bubbleWidth, height: Metrics.bubbleHeight)
+            // Below the bubble: the selected app's name, centred, and a small Manage button at the
+            // right edge, both floating on the transparent window.
+            ZStack {
+                if let name = model.selectedName {
+                    NameLabel(name: name)
+                        .padding(.horizontal, Metrics.nameHeight + 6)
                 }
-                .frame(width: model.contentWidth)
-                .padding(.vertical, 6)
-            } else {
-                ScrollViewReader { proxy in
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: Metrics.tileSpacing) {
-                            ForEach(model.tiles) { tile in
-                                SwitchTile(tile: tile, isSelected: tile.id == model.selection, model: model)
-                                    .id(tile.id)
-                            }
+                HStack {
+                    Spacer(minLength: 0)
+                    ManageButton(action: model.onManage)
+                }
+            }
+            .frame(width: max(model.bubbleWidth, 200), height: Metrics.nameHeight)
+        }
+        .padding(Metrics.shadowMargin)
+    }
+
+    @ViewBuilder
+    private var bubbleContent: some View {
+        if model.tiles.isEmpty {
+            VStack(spacing: 8) {
+                Image(systemName: "pin.slash")
+                    .font(.system(size: 26, weight: .regular))
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                Text(model.message ?? "No pinned apps are running")
+                    .font(.system(size: 14, weight: .medium))
+            }
+        } else {
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Metrics.tileSpacing) {
+                        ForEach(model.tiles) { tile in
+                            SwitchTile(tile: tile, isSelected: tile.id == model.selection, model: model)
+                                .id(tile.id)
                         }
                     }
-                    .frame(width: model.rowWidth, height: Metrics.tileSize)
-                    .onAppear { scroll(proxy, to: model.selection) }
-                    .onChange(of: model.selection) { _, selection in scroll(proxy, to: selection) }
                 }
+                .frame(width: model.rowWidth, height: Metrics.tileSize)
+                .onAppear { scroll(proxy, to: model.selection) }
+                .onChange(of: model.selection) { _, selection in scroll(proxy, to: selection) }
             }
-            ZStack {
-                Text(model.selectedName ?? " ")
-                    .font(.system(size: 15, weight: .medium))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .frame(maxWidth: max(model.contentWidth - 190, 80))
-                    .accessibilityHidden(true)
-                HStack {
-                    Spacer()
-                    PressButton(title: "Manage…", hint: "M", prominent: false, action: model.onManage)
-                }
-            }
-            .frame(width: model.contentWidth)
         }
-        .padding(Metrics.panelPadding)
     }
 
     private func scroll(_ proxy: ScrollViewProxy, to id: AppID?) {
         guard let id else { return }
         proxy.scrollTo(id, anchor: .center)
+    }
+}
+
+/// The selected app's name, in a small pill floating below the bubble.
+private struct NameLabel: View {
+    let name: String
+
+    var body: some View {
+        Text(name)
+            .font(.system(size: 13, weight: .semibold))
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .padding(.horizontal, 14)
+            .frame(height: Metrics.nameHeight)
+            .modifier(PillBackground())
+            .accessibilityHidden(true)
+    }
+}
+
+private struct PillBackground: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content.glassEffect(.regular, in: Capsule())
+        } else {
+            content.background(.regularMaterial, in: Capsule())
+        }
+    }
+}
+
+/// Small round Manage button. It acts on mouse-down, so entering Manage wins against a
+/// near-simultaneous modifier release.
+private struct ManageButton: View {
+    let action: () -> Void
+    @GestureState private var isPressed = false
+    @State private var isHovered = false
+
+    var body: some View {
+        Image(systemName: "ellipsis")
+            .font(.system(size: 13, weight: .bold))
+            .foregroundStyle(isHovered || isPressed ? Color.primary : Color.secondary)
+            .frame(width: Metrics.nameHeight, height: Metrics.nameHeight)
+            .modifier(PillBackground())
+            .contentShape(Circle())
+            .onHover { isHovered = $0 }
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .updating($isPressed) { _, pressed, _ in
+                        guard !pressed else { return }
+                        pressed = true
+                        action()
+                    }
+            )
+            .accessibilityElement()
+            .accessibilityLabel("Manage pinned apps")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { action() }
     }
 }
 

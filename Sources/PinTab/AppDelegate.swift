@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private let apps = RunningApps()
     private lazy var activator = Activator(apps: apps)
     private lazy var switcher = SwitcherController(preferences: preferences, apps: apps, activator: activator)
+    private let eventTap = EventTap()
     private var statusItem: NSStatusItem?
     private var settingsWindow: NSWindow?
 
@@ -29,25 +30,76 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         apps.onTerminate = { [weak self] id in self?.switcher.appTerminated(id) }
 
         HotKeys.shared.onPress = { [weak self] forward in
-            self?.switcher.cyclePressed(forward: forward, fromHotKey: true)
+            guard let shortcut = HotKeys.shared.registered else { return }
+            self?.switcher.cyclePressed(forward: forward, shortcut: shortcut, source: .hotKey)
         }
         activator.shouldIntervene = { [weak self] in self?.switcher.isActive == false }
         HotKeys.shared.installHandler()
         applyShortcut()
 
+        eventTap.phase = { [weak self] in self?.tapPhase ?? .suspended }
+        eventTap.onAction = { [weak self] action in self?.switcher.handleTapAction(action) }
+        eventTap.onStateChange = { [weak self] in self?.refreshCommandTabState() }
+        applyCommandTab()
+
         if let preview = UserDefaults.standard.string(forKey: "PinTabPreview") {
             // Development aid; the argument domain is not persisted.
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
-                MainActor.assumeIsolated { self?.switcher.showPreview(preview) }
+                MainActor.assumeIsolated {
+                    if preview == "settings" { self?.showSettings() } else { self?.switcher.showPreview(preview) }
+                }
             }
-        } else if preferences.shortcut == nil {
+        } else if preferences.shortcut == nil && !preferences.useCommandTab {
+            showSettings()
+        } else if preferences.useCommandTab && !EventTap.isTrusted {
+            // A new build needs Accessibility permission again (ad-hoc signing changes its identity).
+            // Prompting also re-adds PinTab to the Accessibility list after `make install` reset it.
+            EventTap.requestTrust()
             showSettings()
         }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         switcher.closeAll()
+        eventTap.disable()
         HotKeys.shared.unregister()
+    }
+
+    // MARK: ⌘Tab mode
+
+    /// The event tap passes everything through while paused or recording, or when the mode is off.
+    private var tapPhase: TapPhase {
+        guard preferences.useCommandTab, !state.isPaused, !state.isRecordingShortcut else { return .suspended }
+        if switcher.isPreviewing { return .idle }
+        return switcher.tapPhase
+    }
+
+    private func applyCommandTab() {
+        if preferences.useCommandTab && !state.isPaused {
+            eventTap.enable()
+        } else {
+            eventTap.disable()
+        }
+        refreshCommandTabState()
+    }
+
+    private func refreshCommandTabState() {
+        if !preferences.useCommandTab {
+            state.commandTabStatus = .off
+        } else if state.isPaused {
+            // Pausing removes the tap on purpose; only missing permission is worth a warning.
+            state.commandTabStatus = EventTap.isTrusted ? .active : .needsPermission
+        } else {
+            state.commandTabStatus = eventTap.isInstalled ? .active : .needsPermission
+        }
+        updateStatusIcon()
+    }
+
+    private func setUseCommandTab(_ enabled: Bool) {
+        preferences.setUseCommandTab(enabled)
+        Log.app.notice("⌘Tab mode \(enabled ? "on" : "off", privacy: .public)")
+        if enabled && !EventTap.isTrusted { EventTap.requestTrust() }
+        applyCommandTab()
     }
 
     // MARK: Shortcut
@@ -95,6 +147,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         state.isPaused = paused
         if paused { switcher.cancelSwitching() }
         applyShortcut()
+        applyCommandTab()
         Log.app.notice("\(paused ? "Paused" : "Resumed", privacy: .public)")
     }
 
@@ -127,10 +180,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     private func updateStatusIcon() {
-        let inactive = state.isPaused || preferences.shortcut == nil || state.registrationError != nil
-        let image = NSImage(systemSymbolName: inactive ? "pin.slash" : "pin.fill", accessibilityDescription: "PinTab")
-        image?.isTemplate = true
-        statusItem?.button?.image = image
+        let hotKeyActive = preferences.shortcut != nil && state.registrationError == nil
+        let inactive = state.isPaused || !(hotKeyActive || state.commandTabStatus == .active)
+        statusItem?.button?.image = StatusIcon.image
+        // Paused, or no working shortcut: the standard dimmed look for an inactive status item.
+        statusItem?.button?.appearsDisabled = inactive
     }
 
     func menuWillOpen(_ menu: NSMenu) {
@@ -144,6 +198,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         let status = NSMenuItem(title: statusText, action: nil, keyEquivalent: "")
         status.isEnabled = false
         menu.addItem(status)
+        if state.commandTabStatus == .needsPermission && !state.isPaused {
+            menu.addItem(item("Allow ⌘Tab in Accessibility Settings…", #selector(openAccessibilitySettings)))
+        }
         menu.addItem(.separator())
 
         if let front = NSWorkspace.shared.frontmostApplication, let id = apps.identity(of: front) {
@@ -165,9 +222,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
 
     private var statusText: String {
         if state.isPaused { return "PinTab is paused" }
-        guard let shortcut = preferences.shortcut else { return "No shortcut set" }
-        if state.registrationError != nil { return "\(KeyNames.display(shortcut)) is unavailable" }
-        return "Switch with \(KeyNames.display(shortcut))"
+        var working: [String] = []
+        if state.commandTabStatus == .active { working.append("⌘Tab") }
+        if let shortcut = preferences.shortcut, state.registrationError == nil {
+            working.append(KeyNames.display(shortcut))
+        }
+        if !working.isEmpty {
+            let failed = preferences.shortcut.flatMap { state.registrationError != nil ? KeyNames.display($0) : nil }
+            return "Switch with " + working.joined(separator: " or ") + (failed.map { " (\($0) unavailable)" } ?? "")
+        }
+        if state.commandTabStatus == .needsPermission { return "⌘Tab needs Accessibility permission" }
+        if let shortcut = preferences.shortcut { return "\(KeyNames.display(shortcut)) is unavailable" }
+        return "No shortcut set"
     }
 
     private func item(_ title: String, _ action: Selector, key: String = "") -> NSMenuItem {
@@ -193,6 +259,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         showSettings()
     }
 
+    @objc private func openAccessibilitySettings() {
+        askForAccessibility()
+    }
+
+    /// Prompting adds PinTab to the Accessibility list (it may have been reset); then show the pane.
+    private func askForAccessibility() {
+        if !EventTap.isTrusted { EventTap.requestTrust() }
+        EventTap.openAccessibilitySettings()
+    }
+
     @objc private func togglePause() {
         setPaused(!state.isPaused)
     }
@@ -210,6 +286,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                 endRecording: { [weak self] in self?.endRecording() },
                 changeShortcut: { [weak self] in self?.changeShortcut($0) },
                 setPaused: { [weak self] in self?.setPaused($0) },
+                setUseCommandTab: { [weak self] in self?.setUseCommandTab($0) },
+                openAccessibilitySettings: { [weak self] in self?.askForAccessibility() },
                 setLaunchAtLogin: { [weak self] in self?.setLaunchAtLogin($0) },
                 managePins: { [weak self] in self?.switcher.openManage() }
             )

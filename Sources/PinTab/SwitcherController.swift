@@ -21,6 +21,15 @@ final class SwitcherController: NSObject {
     private var revealToken = 0
     private var announcedSelection: AppID?
     private var isPreview = false
+    var isPreviewing: Bool { isPreview }
+    /// The shortcut that opened the current switching session; releasing any of its modifiers commits.
+    private var sessionShortcut: Shortcut?
+
+    enum PressSource: String {
+        case hotKey = "hotkey"
+        case commandTab = "⌘Tab tap"
+        case panel = "panel"
+    }
 
     /// Delay before the switching panel becomes visible, so quick taps switch without a flash.
     private let revealDelay: TimeInterval = 0.12
@@ -56,13 +65,28 @@ final class SwitcherController: NSObject {
         return true
     }
 
+    /// The state the ⌘Tab event tap filters against (the owner maps pause/recording to .suspended).
+    var tapPhase: TapPhase {
+        switch machine.phase {
+        case .idle: return .idle
+        case .switching: return .switching
+        case .managing: return .managing
+        }
+    }
+
     // MARK: Entry points
 
-    /// A press of the registered shortcut (or of its key while the panel has focus).
-    func cyclePressed(forward: Bool, fromHotKey: Bool) {
-        guard let shortcut = preferences.shortcut else { return }
-        let held = shortcut.baseModifiersHeld(in: Self.currentModifiers())
-        Log.input.notice("Press \(forward ? "forward" : "reverse", privacy: .public) held=\(held) source=\(fromHotKey ? "hotkey" : "panel", privacy: .public)")
+    /// A press of a switcher shortcut: the registered hotkey, ⌘Tab through the event tap, or the
+    /// shortcut's key reaching the panel directly (key repeat).
+    func cyclePressed(forward: Bool, shortcut: Shortcut, source: PressSource) {
+        if case .managing = machine.phase {
+            // The editor is open: close it (edits are already saved) and start switching instead.
+            send(.done)
+        }
+        if case .idle = machine.phase { sessionShortcut = shortcut }
+        let active = sessionShortcut ?? shortcut
+        let held = active.baseModifiersHeld(in: Self.currentModifiers())
+        Log.input.notice("Press \(forward ? "forward" : "reverse", privacy: .public) held=\(held) source=\(source.rawValue, privacy: .public)")
 
         guard case .idle = machine.phase else {
             send(.invoke(forward: forward, modifiersHeld: held, candidates: [], origin: nil))
@@ -78,6 +102,19 @@ final class SwitcherController: NSObject {
                                                 recency: apps.recency.order(at: now))
         let origin = apps.recency.origin(frontmost: apps.frontmostID, at: now)
         send(.invoke(forward: forward, modifiersHeld: held, candidates: candidates, origin: origin))
+    }
+
+    /// Input from the ⌘Tab event tap. Keys typed during a session arrive here instead of at the panel.
+    func handleTapAction(_ action: TapAction) {
+        switch action {
+        case .cycle(let forward):
+            cyclePressed(forward: forward, shortcut: .commandTab, source: .commandTab)
+        case let .sessionKey(keyCode, modifiers, isRepeat):
+            guard machine.sessionID != nil else { return }
+            handleSwitchingKey(keyCode: keyCode, modifiers: modifiers, isRepeat: isRepeat, fromTap: true)
+        case .modifiersChanged(let modifiers):
+            releaseIfNeeded(modifiers, source: "event tap")
+        }
     }
 
     func openManage() {
@@ -114,6 +151,7 @@ final class SwitcherController: NSObject {
         } else {
             let candidates = SwitchOrder.candidates(pins: preferences.pins.ids, running: apps.runningIDs,
                                                     recency: apps.recency.order(at: uptime()))
+            sessionShortcut = preferences.shortcut ?? .commandTab
             send(.invoke(forward: true, modifiersHeld: true, candidates: candidates, origin: apps.frontmostID))
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
@@ -261,7 +299,7 @@ final class SwitcherController: NSObject {
         case .switching:
             let natural = count * Metrics.tileSize + max(count - 1, 0) * Metrics.tileSpacing
             model.rowWidth = min(natural, maxContent)
-            model.contentWidth = max(model.rowWidth, Metrics.minSwitchWidth)
+            model.bubbleWidth = (count == 0 ? Metrics.emptyRowWidth : model.rowWidth) + Metrics.bubblePadding * 2
         case .managing:
             let step = Metrics.manageTileWidth + Metrics.manageSpacing
             let fit = max(1, Int((maxContent + Metrics.manageSpacing) / step))
@@ -283,7 +321,24 @@ final class SwitcherController: NSObject {
         let origin = NSPoint(x: (visible.midX - size.width / 2).rounded(),
                              y: (visible.midY - size.height / 2).rounded())
         panel.setFrame(NSRect(origin: origin, size: size), display: true)
-        panel.invalidateShadow()
+        switch model.mode {
+        case .switching:
+            // On macOS 26 the glass draws its own depth; a window shadow would outline the transparent
+            // area around the floating name pill.
+            if #available(macOS 26.0, *) { panel.hasShadow = false }
+            // The bubble sits at the top, centred; the name pill floats below it.
+            let bubble = NSSize(width: model.bubbleWidth, height: Metrics.bubbleHeight)
+            panel.setBubbleFrame(NSRect(x: ((size.width - bubble.width) / 2).rounded(),
+                                        y: size.height - Metrics.shadowMargin - bubble.height,
+                                        width: bubble.width, height: bubble.height))
+        case .managing:
+            panel.hasShadow = true
+            panel.setBubbleFrame(NSRect(origin: .zero, size: size))
+        }
+        // SwiftUI redraws after this pass; recompute the shadow from the finished content.
+        DispatchQueue.main.async { [weak self] in
+            MainActor.assumeIsolated { self?.panel.invalidateShadow() }
+        }
     }
 
     private func hostingLayoutPass() {
@@ -331,16 +386,12 @@ final class SwitcherController: NSObject {
         let modifiers = KeyModifiers(eventFlags: event.modifierFlags.rawValue)
         switch event.type {
         case .flagsChanged:
-            if machine.sessionID != nil, !isPreview, let shortcut = preferences.shortcut,
-               !shortcut.baseModifiersHeld(in: modifiers) {
-                Log.input.notice("Modifier release seen by panel")
-                send(.modifiersReleased)
-            }
+            releaseIfNeeded(modifiers, source: "panel")
             return false
         case .keyDown:
             guard event.window === panel else { return false }
             if machine.sessionID != nil {
-                handleSwitchingKey(event, modifiers)
+                handleSwitchingKey(keyCode: event.keyCode, modifiers: modifiers, isRepeat: event.isARepeat, fromTap: false)
             } else {
                 handleManagingKey(event, modifiers)
             }
@@ -350,17 +401,18 @@ final class SwitcherController: NSObject {
         }
     }
 
-    private func handleSwitchingKey(_ event: NSEvent, _ modifiers: KeyModifiers) {
-        if let shortcut = preferences.shortcut, event.keyCode == shortcut.keyCode {
-            // Exact forward/reverse combinations arrive through the registered hotkey. The panel only
-            // counts what the hotkey cannot deliver: key repeat and presses with other modifier sets.
+    private func handleSwitchingKey(keyCode: UInt16, modifiers: KeyModifiers, isRepeat: Bool, fromTap: Bool) {
+        if let shortcut = sessionShortcut, keyCode == shortcut.keyCode {
+            // Exact forward/reverse combinations normally arrive through the registered hotkey, so the
+            // panel only counts key repeat and other modifier sets. The event tap swallows the key
+            // before any hotkey could see it, so its presses always count.
             let registered = modifiers == shortcut.modifiers || modifiers == shortcut.reverseModifiers
-            if event.isARepeat || !registered {
-                cyclePressed(forward: !modifiers.contains(.shift), fromHotKey: false)
+            if fromTap || isRepeat || !registered {
+                cyclePressed(forward: !modifiers.contains(.shift), shortcut: shortcut, source: fromTap ? .commandTab : .panel)
             }
             return
         }
-        switch event.keyCode {
+        switch keyCode {
         case KeyCode.escape, KeyCode.period:
             send(.cancel)
         case KeyCode.leftArrow, KeyCode.upArrow:
@@ -424,12 +476,17 @@ final class SwitcherController: NSObject {
         pollTimer = nil
     }
 
-    private func checkModifiers(source: StaticString) {
-        guard machine.sessionID != nil, !isPreview, let shortcut = preferences.shortcut else { return }
-        if !shortcut.baseModifiersHeld(in: Self.currentModifiers()) {
-            Log.input.notice("Modifier release seen by \(source)")
-            send(.modifiersReleased)
-        }
+    private func checkModifiers(source: String) {
+        releaseIfNeeded(Self.currentModifiers(), source: source)
+    }
+
+    /// Commits when any base modifier of the session's shortcut is no longer held.
+    private func releaseIfNeeded(_ modifiers: KeyModifiers, source: String) {
+        guard machine.sessionID != nil, !isPreview, let shortcut = sessionShortcut,
+              !shortcut.baseModifiersHeld(in: modifiers)
+        else { return }
+        Log.input.notice("Modifier release seen by \(source, privacy: .public)")
+        send(.modifiersReleased)
     }
 
     static func currentModifiers() -> KeyModifiers {

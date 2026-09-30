@@ -2,22 +2,31 @@ import Foundation
 import Observation
 import PinTabCore
 
-/// Durable settings: pinned app identities and the switcher shortcut. Nothing else is stored.
+/// Durable settings: pinned app identities, the switcher shortcut and whether ⌘Tab mode is on.
 @Observable
 final class Preferences {
     private enum Key {
         static let pins = "pins"
         static let shortcut = "shortcut"
+        static let useCommandTab = "useCommandTab"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
     private(set) var pins: PinList
     private(set) var shortcut: Shortcut?
+    /// Take over ⌘Tab through an event tap (needs Accessibility permission).
+    private(set) var useCommandTab: Bool
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         pins = PreferencesCodec.decodePins(defaults.data(forKey: Key.pins))
         shortcut = PreferencesCodec.decodeShortcut(defaults.data(forKey: Key.shortcut))
+        useCommandTab = defaults.bool(forKey: Key.useCommandTab)
+    }
+
+    func setUseCommandTab(_ enabled: Bool) {
+        useCommandTab = enabled
+        defaults.set(enabled, forKey: Key.useCommandTab)
     }
 
     func setPinned(_ id: AppID, name: String, pinned: Bool) {

@@ -2,14 +2,14 @@
 
 APP_NAME    := PinTab
 BUNDLE_ID   := dev.local.PinTab
-VERSION     := 0.1.0
+VERSION     := 0.2.0
 BUILD_DIR   := build
 APP_BUNDLE  := $(BUILD_DIR)/$(APP_NAME).app
 ARCH        := $(shell uname -m)
 DMG         := $(BUILD_DIR)/$(APP_NAME)-$(VERSION)-mac-$(ARCH).dmg
 INSTALL_DIR := $(HOME)/Applications
 # "-" is an ad-hoc signature. Set SIGN_IDENTITY to a self-signed certificate name to keep a stable
-# identity across rebuilds (only matters if a privacy permission is ever required).
+# identity across rebuilds, so ⌘Tab mode's Accessibility permission survives reinstalling.
 SIGN_IDENTITY ?= -
 
 # With only Command Line Tools installed, swift-testing lives outside the default search paths.
@@ -46,6 +46,9 @@ icon:
 
 install: app
 	-@pkill -x $(APP_NAME) && sleep 0.5 || true
+	@# An ad-hoc build is a new identity to macOS, so an existing Accessibility entry can never match it.
+	@# Clearing it makes macOS prompt again instead of showing a switch that is on but has no effect.
+	@if [ "$(SIGN_IDENTITY)" = "-" ]; then tccutil reset Accessibility $(BUNDLE_ID) >/dev/null 2>&1 || true; fi
 	mkdir -p "$(INSTALL_DIR)"
 	rm -rf "$(INSTALL_DIR)/$(APP_NAME).app"
 	ditto "$(APP_BUNDLE)" "$(INSTALL_DIR)/$(APP_NAME).app"
@@ -59,6 +62,7 @@ uninstall:
 
 run: app
 	-@pkill -x $(APP_NAME) && sleep 0.5 || true
+	@if [ "$(SIGN_IDENTITY)" = "-" ]; then tccutil reset Accessibility $(BUNDLE_ID) >/dev/null 2>&1 || true; fi
 	open "$(APP_BUNDLE)"
 
 logs:
