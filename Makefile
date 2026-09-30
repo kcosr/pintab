@@ -6,7 +6,16 @@ VERSION     := 0.2.1
 BUILD_DIR   := build
 APP_BUNDLE  := $(BUILD_DIR)/$(APP_NAME).app
 ARCH        := $(shell uname -m)
+# Test builds are named after the commit (plus -dirty for uncommitted changes), so they never
+# overwrite a release. `make dmg RELEASE=1` gives the plain release name; the version itself is only
+# bumped when merging.
+GIT_SHA     := $(shell git rev-parse --short HEAD 2>/dev/null)
+GIT_DIRTY   := $(shell git status --porcelain 2>/dev/null | grep -q . && echo -dirty)
+ifeq ($(RELEASE),1)
 DMG         := $(BUILD_DIR)/$(APP_NAME)-$(VERSION)-mac-$(ARCH).dmg
+else
+DMG         := $(BUILD_DIR)/$(APP_NAME)-$(VERSION)-$(GIT_SHA)$(GIT_DIRTY)-mac-$(ARCH).dmg
+endif
 INSTALL_DIR := $(HOME)/Applications
 # "-" is an ad-hoc signature. Set SIGN_IDENTITY to a self-signed certificate name to keep a stable
 # identity across rebuilds, so ⌘Tab mode's Accessibility permission survives reinstalling.

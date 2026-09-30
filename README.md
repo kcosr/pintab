@@ -153,7 +153,8 @@ A recorded shortcut must follow these rules:
 | `make install` | Build a release, sign it ad hoc, install to `~/Applications` and launch |
 | `make test` | Run the PinTabCore test suite (Swift Testing) |
 | `make app` | Build `build/PinTab.app` without installing |
-| `make dmg` | Build `build/PinTab-<version>-mac-<arch>.dmg` |
+| `make dmg` | Build a test disk image, `build/PinTab-<version>-<commit>-mac-<arch>.dmg` (with `-dirty` if there are uncommitted changes) |
+| `make dmg RELEASE=1` | Build the release disk image, `build/PinTab-<version>-mac-<arch>.dmg` |
 | `make run` | Build and launch `build/PinTab.app` |
 | `make logs` | Stream PinTab's log messages |
 | `make icon` | Regenerate `Support/AppIcon.icns` |
