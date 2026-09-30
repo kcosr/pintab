@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="docs/images/switcher.png" alt="The PinTab switcher: six pinned app icons in a glass panel, with Safari selected and its name shown below" width="600">
+  <img src="assets/switcher.png" alt="The PinTab switcher: three pinned app icons in a glass panel over the desktop, with Sedes selected and its name shown below" width="440">
+</p>
+
+<p align="center">
+  <img src="assets/pin-editor.png" alt="The Pinned Apps editor: running apps as tiles, with the pinned ones highlighted and marked with a filled pin" width="800">
 </p>
 
 # PinTab
@@ -61,10 +65,6 @@ To pin the app you're using, choose **Pin “‹app›”** from the menu-bar ic
 - **Where the panel appears.** On the display that has the pointer.
 
 ## Pinning apps
-
-<p align="center">
-  <img src="docs/images/editor.png" alt="The Pinned Apps editor: running apps as tiles, pinned ones highlighted with a filled pin badge" width="680">
-</p>
 
 To open the pin editor, use any of these:
 - press M or click **⋯** in the switcher;
@@ -171,7 +171,7 @@ Sources/PinTab/         The app: hotkeys, event tap, panel and views, activation
 Tests/PinTabCoreTests/  Swift Testing suite for PinTabCore
 Support/                Info.plist template and app icon
 scripts/                make-app.sh (bundle and sign), make-dmg.sh, make-icon.swift
-docs/images/            README screenshots
+assets/                 README screenshots
 ```
 
 **How it works.**
