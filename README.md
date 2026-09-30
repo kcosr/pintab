@@ -57,6 +57,7 @@ To pin the app you're using, choose **Pin “‹app›”** from the menu-bar ic
 | Click an icon, or press Return | Switch immediately |
 | Esc or `.` (period) | Cancel without switching |
 | M, or click **⋯** | Open the pin editor |
+| S, or click **⌘** | Use the macOS switcher this time (⌘Tab mode only) |
 | P, or click **⏸** | Pause PinTab and hand over to the macOS switcher |
 
 - **Quick tap.** Pressing and releasing the shortcut quickly switches to your previous pinned app without showing the panel. Tap again to flip back.
@@ -90,7 +91,8 @@ Good to know:
 
 - **Your other shortcut keeps working.** A recorded shortcut such as ⌥⌘Tab needs no permission, so it still works even without Accessibility access.
 - **Secure text entry.** macOS hides keystrokes from event taps in password fields and when Terminal's Secure Keyboard Entry is on. There, ⌘Tab shows the macOS switcher until you leave the field.
-- **Getting the macOS switcher back.** It's replaced while ⌘Tab mode is on. To bring it back temporarily, press P or click **⏸** in the switcher, or choose **Pause PinTab** from the menu.
+- **Using the macOS switcher just this once.** In PinTab's switcher, press S or click **⌘**. PinTab closes its switcher and opens the macOS one, and you're still holding ⌘. Tap Tab and release as usual. Once you let go of ⌘, the next ⌘Tab is PinTab's again. This works only in ⌘Tab mode: the macOS switcher needs ⌘ alone, and opening it needs ⌘Tab mode's Accessibility permission.
+- **Getting the macOS switcher back for longer.** It's replaced while ⌘Tab mode is on. To bring it back until you resume, press P or click **⏸** in the switcher, or choose **Pause PinTab** from the menu.
 - **Each new version needs the permission again.** PinTab is signed ad hoc, so macOS treats every new build as a different app. If PinTab is listed as allowed but ⌘Tab opens the macOS switcher, select PinTab in the Accessibility list, remove it with **−**, then turn it on again.
 
 ## Menu bar and Settings
@@ -117,7 +119,7 @@ A recorded shortcut must follow these rules:
 - **Nothing leaves your Mac.** PinTab makes no network connections and has no analytics, crash reporting or updater.
 - **What it stores:** your pinned apps (bundle identifiers and names), your shortcut, and whether ⌘Tab mode is on. These live in the `dev.local.PinTab` defaults domain.
 - **Without ⌘Tab mode** it needs no special permissions. It registers one keyboard shortcut and can't see any other keystrokes.
-- **With ⌘Tab mode** it acts only on ⌘Tab and on keys pressed while its switcher is open. It never records or logs typing.
+- **With ⌘Tab mode** it acts only on ⌘Tab and on keys pressed while its switcher is open. It never records or logs typing. The only keystroke it ever sends is a ⌘Tab that opens the macOS switcher, and only when you ask for it with S or **⌘**.
 
 ## Troubleshooting
 

@@ -58,6 +58,10 @@ final class SwitcherController: NSObject {
             guard let self, self.isPresented else { return }
             self.pauseFromSwitcher()
         }
+        model.onHandOff = { [weak self] in
+            guard let self, self.isPresented else { return }
+            self.handOffToSystemSwitcher()
+        }
         NotificationCenter.default.addObserver(self, selector: #selector(panelDidResignKey(_:)),
                                                name: NSWindow.didResignKeyNotification, object: panel)
         NotificationCenter.default.addObserver(self, selector: #selector(screensChanged(_:)),
@@ -66,6 +70,10 @@ final class SwitcherController: NSObject {
 
     /// Asks the owner to pause PinTab (the ⏸ button or P in the switcher).
     var onPause: () -> Void = {}
+    /// Whether this session can be handed to the macOS switcher (⌘Tab mode with the tap installed).
+    var canHandOff: () -> Bool = { false }
+    /// Asks the owner to hand the current ⌘ hold to the macOS switcher (the ⌘ button or S).
+    var onHandOff: () -> Void = {}
 
     var isActive: Bool {
         if case .idle = machine.phase { return false }
@@ -158,7 +166,8 @@ final class SwitcherController: NSObject {
         } else {
             let candidates = SwitchOrder.candidates(pins: preferences.pins.ids, running: apps.runningIDs,
                                                     recency: apps.recency.order(at: uptime()))
-            sessionShortcut = preferences.shortcut ?? .commandTab
+            // Preview as a ⌘Tab session so every switcher button is shown.
+            sessionShortcut = .commandTab
             send(.invoke(forward: true, modifiersHeld: true, candidates: candidates, origin: apps.frontmostID))
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
@@ -279,6 +288,7 @@ final class SwitcherController: NSObject {
             model.tiles = session.order.map { tile(for: $0, pinned: true, running: true, canToggle: false) }
             model.selection = session.selection
             model.message = session.order.isEmpty ? "No pinned apps are running" : nil
+            model.canHandOff = sessionShortcut == .commandTab && (canHandOff() || isPreview)
         case .managing(let session):
             model.mode = .managing
             model.tiles = session.items.map {
@@ -432,6 +442,8 @@ final class SwitcherController: NSObject {
             openManage()
         case KeyCode.p:
             pauseFromSwitcher()
+        case KeyCode.s:
+            if model.canHandOff { handOffToSystemSwitcher() }
         default:
             break // Other keys are ignored while switching; nothing is replayed to other apps.
         }
@@ -446,6 +458,18 @@ final class SwitcherController: NSObject {
         // (and swallow the P) before the tap goes away.
         DispatchQueue.main.async { [weak self] in
             MainActor.assumeIsolated { self?.onPause() }
+        }
+    }
+
+    /// Closes the switcher without switching and lets the macOS switcher take over for the rest of this
+    /// ⌘ hold. Only offered for sessions opened with ⌘Tab: the macOS switcher needs ⌘ alone, and
+    /// replaying the keystroke needs ⌘Tab mode's Accessibility permission.
+    private func handOffToSystemSwitcher() {
+        Log.session.notice("Hand-off to the macOS switcher requested")
+        send(.cancel)
+        // Let the panel close (and, for S, the tap callback finish) before replaying ⌘Tab.
+        DispatchQueue.main.async { [weak self] in
+            MainActor.assumeIsolated { self?.onHandOff() }
         }
     }
 

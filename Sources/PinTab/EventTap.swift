@@ -18,6 +18,9 @@ final class EventTap {
 
     private(set) var isInstalled = false
 
+    /// Tags keystrokes PinTab posts itself, so its own tap always lets them through.
+    nonisolated fileprivate static let syntheticMarker: Int64 = 0x5054_4142 // 'PTAB'
+
     private var enabled = false
     private var port: CFMachPort?
     private var source: CFRunLoopSource?
@@ -67,6 +70,28 @@ final class EventTap {
         guard isInstalled else { return }
         uninstall()
         onStateChange()
+    }
+
+    /// Steps aside for the rest of the current ⌘ hold and opens the macOS switcher by replaying ⌘Tab.
+    /// Releasing ⌘ ends the hand-off, so the next ⌘Tab is PinTab's again. Posting keystrokes uses the
+    /// same Accessibility permission as the tap itself.
+    func handOffToSystemSwitcher() {
+        guard isInstalled else { return }
+        let held = KeyModifiers(eventFlags: UInt(CGEventSource.flagsState(.combinedSessionState).rawValue))
+        guard held.contains(.command) else {
+            Log.input.notice("Not handing off to the macOS switcher: ⌘ is no longer held")
+            return
+        }
+        filter.handOff()
+        let source = CGEventSource(stateID: .hidSystemState)
+        for isDown in [true, false] {
+            guard let event = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(KeyCode.tab), keyDown: isDown)
+            else { continue }
+            event.flags = .maskCommand
+            event.setIntegerValueField(.eventSourceUserData, value: Self.syntheticMarker)
+            event.post(tap: .cghidEventTap)
+        }
+        Log.input.notice("Handed off to the macOS switcher until ⌘ is released")
     }
 
     // MARK: - Tap lifecycle
@@ -189,6 +214,10 @@ final class EventTap {
 nonisolated private func eventTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent,
                                           userInfo: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
     guard let userInfo else { return Unmanaged.passUnretained(event) }
+    // PinTab's own replayed ⌘Tab (a hand-off to the macOS switcher) always passes untouched.
+    if event.getIntegerValueField(.eventSourceUserData) == EventTap.syntheticMarker {
+        return Unmanaged.passUnretained(event)
+    }
     let owner = Unmanaged<EventTap>.fromOpaque(userInfo).takeUnretainedValue()
     let kind: TapEventKind
     switch type {

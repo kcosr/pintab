@@ -292,3 +292,46 @@ struct CommandTabFilterReviewTests {
         #expect(filter.decide(.keyUp, keyCode: KeyCode.tab, modifiers: [], isRepeat: false, phase: .idle) == .pass)
     }
 }
+
+@Suite("Command-Tab filter: handing off to the macOS switcher")
+struct CommandTabFilterHandOffTests {
+    @Test func commandTabPassesThroughUntilCommandIsReleased() {
+        var filter = CommandTabFilter()
+        filter.handOff()
+        #expect(filter.isHandingOff)
+        // Still holding ⌘: every press goes to the macOS switcher, whatever PinTab's phase.
+        for phase in [TapPhase.idle, .switching, .managing] {
+            #expect(filter.decide(.keyDown, keyCode: KeyCode.tab, modifiers: .command, isRepeat: false, phase: phase) == .pass)
+            #expect(filter.decide(.keyUp, keyCode: KeyCode.tab, modifiers: .command, isRepeat: false, phase: phase) == .pass)
+        }
+        #expect(filter.decide(.keyDown, keyCode: KeyCode.tab, modifiers: [.command, .shift], isRepeat: false, phase: .idle) == .pass)
+        // Shift changing does not end the hand-off.
+        #expect(filter.decide(.flagsChanged, keyCode: 0x38, modifiers: [.command, .shift], isRepeat: false, phase: .idle) == .pass)
+        #expect(filter.isHandingOff)
+        // Releasing ⌘ ends it; the next ⌘Tab is PinTab's again.
+        #expect(filter.decide(.flagsChanged, keyCode: 0x37, modifiers: [], isRepeat: false, phase: .idle) == .pass)
+        #expect(!filter.isHandingOff)
+        #expect(filter.decide(.keyDown, keyCode: KeyCode.tab, modifiers: .command, isRepeat: false, phase: .idle).action == .cycle(forward: true))
+    }
+
+    @Test func keyUpOfTheSwallowedPressIsStillSwallowedDuringHandOff() {
+        var filter = CommandTabFilter()
+        _ = filter.decide(.keyDown, keyCode: KeyCode.s, modifiers: .command, isRepeat: false, phase: .switching)
+        filter.handOff()
+        #expect(filter.decide(.keyUp, keyCode: KeyCode.s, modifiers: .command, isRepeat: false, phase: .idle).swallow)
+    }
+
+    @Test func noSessionActionsWhileHandingOff() {
+        var filter = CommandTabFilter()
+        filter.handOff()
+        #expect(filter.decide(.flagsChanged, keyCode: 0x38, modifiers: [.command, .shift], isRepeat: false, phase: .switching).action == nil)
+        #expect(filter.decide(.keyDown, keyCode: KeyCode.escape, modifiers: .command, isRepeat: false, phase: .switching) == .pass)
+    }
+
+    @Test func resetEndsAHandOff() {
+        var filter = CommandTabFilter()
+        filter.handOff()
+        filter.reset()
+        #expect(!filter.isHandingOff)
+    }
+}

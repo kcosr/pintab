@@ -51,6 +51,9 @@ public struct CommandTabFilter: Sendable {
     public let shortcut: Shortcut
     /// Keys whose key-down was swallowed and whose key-up has not been seen yet.
     private var swallowedKeys: Set<UInt16> = []
+    /// Set by handOff() until the shortcut's modifiers are released: for the rest of that hold,
+    /// PinTab steps aside so the macOS switcher gets ⌘Tab.
+    public private(set) var isHandingOff = false
 
     public init(shortcut: Shortcut = .commandTab) {
         self.shortcut = shortcut
@@ -59,6 +62,11 @@ public struct CommandTabFilter: Sendable {
     public mutating func decide(
         _ kind: TapEventKind, keyCode: UInt16, modifiers: KeyModifiers, isRepeat: Bool, phase: TapPhase
     ) -> TapDecision {
+        if kind == .flagsChanged, isHandingOff, !modifiers.isSuperset(of: shortcut.modifiers) {
+            isHandingOff = false // ⌘ released: the next ⌘Tab is PinTab's again
+        }
+        // While handing off, behave exactly as if suspended (key-up hygiene still applies).
+        let phase = isHandingOff ? .suspended : phase
         switch kind {
         case .flagsChanged:
             guard phase == .switching else { return .pass }
@@ -72,9 +80,17 @@ public struct CommandTabFilter: Sendable {
         }
     }
 
-    /// Forgets which key-downs were swallowed (for example after the tap is re-created).
+    /// Steps aside until the shortcut's modifiers are released, so presses during the current hold
+    /// reach the macOS switcher.
+    public mutating func handOff() {
+        isHandingOff = true
+    }
+
+    /// Forgets which key-downs were swallowed and ends any hand-off (for example after the tap is
+    /// re-created).
     public mutating func reset() {
         swallowedKeys.removeAll()
+        isHandingOff = false
     }
 
     private mutating func decideKeyDown(

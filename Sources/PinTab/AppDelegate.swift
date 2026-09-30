@@ -35,6 +35,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         }
         activator.shouldIntervene = { [weak self] in self?.switcher.isActive == false }
         switcher.onPause = { [weak self] in self?.setPaused(true) }
+        switcher.canHandOff = { [weak self] in self?.eventTap.isInstalled == true }
+        switcher.onHandOff = { [weak self] in self?.eventTap.handOffToSystemSwitcher() }
         HotKeys.shared.installHandler()
         applyShortcut()
 
