@@ -54,11 +54,18 @@ final class SwitcherController: NSObject {
             guard let self, self.isPresented else { return }
             self.send(.done)
         }
+        model.onPause = { [weak self] in
+            guard let self, self.isPresented else { return }
+            self.pauseFromSwitcher()
+        }
         NotificationCenter.default.addObserver(self, selector: #selector(panelDidResignKey(_:)),
                                                name: NSWindow.didResignKeyNotification, object: panel)
         NotificationCenter.default.addObserver(self, selector: #selector(screensChanged(_:)),
                                                name: NSApplication.didChangeScreenParametersNotification, object: nil)
     }
+
+    /// Asks the owner to pause PinTab (the ⏸ button or P in the switcher).
+    var onPause: () -> Void = {}
 
     var isActive: Bool {
         if case .idle = machine.phase { return false }
@@ -423,8 +430,22 @@ final class SwitcherController: NSObject {
             if let selection = model.selection { send(.click(selection)) }
         case KeyCode.m:
             openManage()
+        case KeyCode.p:
+            pauseFromSwitcher()
         default:
             break // Other keys are ignored while switching; nothing is replayed to other apps.
+        }
+    }
+
+    /// Closes the switcher without switching, then pauses PinTab, so the next ⌘Tab (even with ⌘
+    /// still held) reaches the macOS switcher. Resuming is done from the menu.
+    private func pauseFromSwitcher() {
+        Log.session.notice("Pause requested from the switcher")
+        send(.cancel)
+        // Pausing removes the ⌘Tab event tap. When P arrived through that tap, let its callback finish
+        // (and swallow the P) before the tap goes away.
+        DispatchQueue.main.async { [weak self] in
+            MainActor.assumeIsolated { self?.onPause() }
         }
     }
 

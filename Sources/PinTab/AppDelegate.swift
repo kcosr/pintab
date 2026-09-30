@@ -34,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             self?.switcher.cyclePressed(forward: forward, shortcut: shortcut, source: .hotKey)
         }
         activator.shouldIntervene = { [weak self] in self?.switcher.isActive == false }
+        switcher.onPause = { [weak self] in self?.setPaused(true) }
         HotKeys.shared.installHandler()
         applyShortcut()
 

@@ -60,6 +60,7 @@ final class SwitcherViewModel {
     @ObservationIgnored var onPoint: (AppID) -> Void = { _ in }
     @ObservationIgnored var onClick: (AppID) -> Void = { _ in }
     @ObservationIgnored var onManage: () -> Void = {}
+    @ObservationIgnored var onPause: () -> Void = {}
     @ObservationIgnored var onDone: () -> Void = {}
 
     var selectedName: String? {
@@ -90,16 +91,18 @@ private struct SwitchingView: View {
         VStack(spacing: Metrics.nameGap) {
             bubbleContent
                 .frame(width: model.bubbleWidth, height: Metrics.bubbleHeight)
-            // Below the bubble: the selected app's name, centred, and a small Manage button at the
-            // right edge, both floating on the transparent window.
+            // Below the bubble, floating on the transparent window: Pause at the left edge, the selected
+            // app's name in the middle, and Manage at the right edge.
             ZStack {
                 if let name = model.selectedName {
                     NameLabel(name: name)
                         .padding(.horizontal, Metrics.nameHeight + 6)
                 }
                 HStack {
+                    CircleButton(systemImage: "pause.fill", size: 11,
+                                 label: "Pause PinTab and use the macOS switcher", action: model.onPause)
                     Spacer(minLength: 0)
-                    ManageButton(action: model.onManage)
+                    CircleButton(systemImage: "ellipsis", size: 13, label: "Manage pinned apps", action: model.onManage)
                 }
             }
             .frame(width: max(model.bubbleWidth, 200), height: Metrics.nameHeight)
@@ -167,16 +170,19 @@ private struct PillBackground: ViewModifier {
     }
 }
 
-/// Small round Manage button. It acts on mouse-down, so entering Manage wins against a
-/// near-simultaneous modifier release.
-private struct ManageButton: View {
+/// Small round glass button below the bubble (Pause, Manage). It acts on mouse-down, so the click
+/// wins against a near-simultaneous modifier release.
+private struct CircleButton: View {
+    let systemImage: String
+    let size: CGFloat
+    let label: String
     let action: () -> Void
     @GestureState private var isPressed = false
     @State private var isHovered = false
 
     var body: some View {
-        Image(systemName: "ellipsis")
-            .font(.system(size: 13, weight: .bold))
+        Image(systemName: systemImage)
+            .font(.system(size: size, weight: .bold))
             .foregroundStyle(isHovered || isPressed ? Color.primary : Color.secondary)
             .frame(width: Metrics.nameHeight, height: Metrics.nameHeight)
             .modifier(PillBackground())
@@ -191,7 +197,7 @@ private struct ManageButton: View {
                     }
             )
             .accessibilityElement()
-            .accessibilityLabel("Manage pinned apps")
+            .accessibilityLabel(label)
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { action() }
     }

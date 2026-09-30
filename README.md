@@ -57,12 +57,14 @@ To pin the app you're using, choose **Pin “‹app›”** from the menu-bar ic
 | Click an icon, or press Return | Switch immediately |
 | Esc or `.` (period) | Cancel without switching |
 | M, or click **⋯** | Open the pin editor |
+| P, or click **⏸** | Pause PinTab and hand over to the macOS switcher |
 
 - **Quick tap.** Pressing and releasing the shortcut quickly switches to your previous pinned app without showing the panel. Tap again to flip back.
 - **Order.** Apps are listed most recently used first, starting from when PinTab launched. Starting from an app that isn't pinned, the first press selects your most recent pin.
 - **⌥⌘ shortcuts.** Cancel with `.` rather than Esc, because macOS reserves ⌥⌘Esc for Force Quit.
 - **What switching does.** Switching activates the app, like ⌘Tab. It doesn't reopen minimized windows, launch apps that aren't running, or change Spaces beyond what macOS does itself.
 - **Where the panel appears.** On the display that has the pointer.
+- **Pausing from the switcher.** Pausing closes the switcher without switching and stops PinTab listening for ⌘Tab and your shortcut. Keep holding ⌘ and press Tab again to get the macOS switcher. Choose **Resume PinTab** from the menu-bar icon to turn PinTab back on.
 
 ## Pinning apps
 
@@ -88,7 +90,7 @@ Good to know:
 
 - **Your other shortcut keeps working.** A recorded shortcut such as ⌥⌘Tab needs no permission, so it still works even without Accessibility access.
 - **Secure text entry.** macOS hides keystrokes from event taps in password fields and when Terminal's Secure Keyboard Entry is on. There, ⌘Tab shows the macOS switcher until you leave the field.
-- **Getting the macOS switcher back.** It's replaced while ⌘Tab mode is on. Choose **Pause PinTab** from the menu to bring it back temporarily.
+- **Getting the macOS switcher back.** It's replaced while ⌘Tab mode is on. To bring it back temporarily, press P or click **⏸** in the switcher, or choose **Pause PinTab** from the menu.
 - **Each new version needs the permission again.** PinTab is signed ad hoc, so macOS treats every new build as a different app. If PinTab is listed as allowed but ⌘Tab opens the macOS switcher, select PinTab in the Accessibility list, remove it with **−**, then turn it on again.
 
 ## Menu bar and Settings

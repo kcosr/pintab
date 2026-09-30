@@ -89,6 +89,7 @@ public enum KeyCode {
     public static let downArrow: UInt16 = 0x7D
     public static let upArrow: UInt16 = 0x7E
     public static let m: UInt16 = 0x2E
+    public static let p: UInt16 = 0x23
     public static let period: UInt16 = 0x2F
     public static let q: UInt16 = 0x0C
     public static let w: UInt16 = 0x0D
