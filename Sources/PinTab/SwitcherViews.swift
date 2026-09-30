@@ -109,7 +109,7 @@ private struct SwitchingView: View {
                     }
                     Spacer(minLength: 0)
                     CircleButton(systemImage: "pause.fill", size: 11,
-                                 label: "Pause PinTab and use the macOS switcher", action: model.onPause)
+                                 label: "Pause PinTab", action: model.onPause)
                     CircleButton(systemImage: "ellipsis", size: 13, label: "Manage pinned apps", action: model.onManage)
                 }
             }

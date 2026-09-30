@@ -335,3 +335,49 @@ struct CommandTabFilterHandOffTests {
         #expect(!filter.isHandingOff)
     }
 }
+
+@Suite("Command-Tab filter: review fixes for hand-off and pausing")
+struct CommandTabFilterHandOffReviewTests {
+    @Test func keystrokesWithoutCommandDoNotEndAHandOff() {
+        var filter = CommandTabFilter()
+        filter.handOff()
+        // Another app posts a key without ⌘ while ⌘ is physically held: the hand-off must continue.
+        #expect(filter.decide(.keyDown, keyCode: 0x00, modifiers: [], isRepeat: false, phase: .idle) == .pass)
+        #expect(filter.isHandingOff)
+        // A hidden ⌘ release is ended by the owner's state check instead.
+        filter.endHandOff()
+        #expect(filter.decide(.keyDown, keyCode: KeyCode.tab, modifiers: .command, isRepeat: false, phase: .idle).action == .cycle(forward: true))
+    }
+
+    @Test func endHandOffStopsPassingThrough() {
+        var filter = CommandTabFilter()
+        filter.handOff()
+        filter.endHandOff()
+        #expect(filter.decide(.keyDown, keyCode: KeyCode.tab, modifiers: .command, isRepeat: false, phase: .idle).swallow)
+    }
+
+    @Test func ownsKeysTracksSwallowedPressesUntilTheirRelease() {
+        var filter = CommandTabFilter()
+        #expect(!filter.ownsKeys)
+        _ = filter.decide(.keyDown, keyCode: KeyCode.p, modifiers: .command, isRepeat: false, phase: .switching)
+        #expect(filter.ownsKeys)
+        #expect(filter.ownedKeys == [KeyCode.p])
+        // Suspended (paused): the P key-up is still swallowed, and then nothing is owned.
+        #expect(filter.decide(.keyUp, keyCode: KeyCode.p, modifiers: .command, isRepeat: false, phase: .suspended).swallow)
+        #expect(!filter.ownsKeys)
+    }
+}
+
+@Suite("Command-Tab filter: forgetting keys keeps a hand-off")
+struct CommandTabFilterForgetKeysTests {
+    @Test func forgetKeysClearsOwnershipButNotAHandOff() {
+        var filter = CommandTabFilter()
+        _ = filter.decide(.keyDown, keyCode: KeyCode.escape, modifiers: .command, isRepeat: false, phase: .switching)
+        filter.handOff()
+        filter.forgetKeys()
+        #expect(!filter.ownsKeys)
+        #expect(filter.isHandingOff)
+        // ⌘ still held: the next Tab still goes to the macOS switcher.
+        #expect(filter.decide(.keyDown, keyCode: KeyCode.tab, modifiers: .command, isRepeat: false, phase: .idle) == .pass)
+    }
+}

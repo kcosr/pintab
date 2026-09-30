@@ -2,7 +2,7 @@
 
 APP_NAME    := PinTab
 BUNDLE_ID   := dev.local.PinTab
-VERSION     := 0.2.3
+VERSION     := 0.2.4
 BUILD_DIR   := build
 APP_BUNDLE  := $(BUILD_DIR)/$(APP_NAME).app
 ARCH        := $(shell uname -m)

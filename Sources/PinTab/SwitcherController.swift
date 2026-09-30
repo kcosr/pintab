@@ -72,8 +72,11 @@ final class SwitcherController: NSObject {
     var onPause: () -> Void = {}
     /// Whether this session can be handed to the macOS switcher (⌘Tab mode with the tap installed).
     var canHandOff: () -> Bool = { false }
-    /// Asks the owner to hand the current ⌘ hold to the macOS switcher (the ⌘ button or S).
-    var onHandOff: () -> Void = {}
+    /// Claims the current ⌘ hold for the macOS switcher (the ⌘ button, S or Esc). False if ⌘ is
+    /// already up or the tap is gone.
+    var beginHandOff: () -> Bool = { false }
+    /// Opens the macOS switcher once PinTab's panel has closed.
+    var replayHandOff: () -> Void = {}
 
     var isActive: Bool {
         if case .idle = machine.phase { return false }
@@ -458,22 +461,25 @@ final class SwitcherController: NSObject {
     private func pauseFromSwitcher() {
         Log.session.notice("Pause requested from the switcher")
         send(.cancel)
-        // Pausing removes the ⌘Tab event tap. When P arrived through that tap, let its callback finish
-        // (and swallow the P) before the tap goes away.
-        DispatchQueue.main.async { [weak self] in
-            MainActor.assumeIsolated { self?.onPause() }
-        }
+        // Immediately, so no new session can start. The event tap stays until swallowed keys (such as
+        // this P) are released, so their key-ups never reach other apps.
+        onPause()
     }
 
     /// Closes the switcher without switching and lets the macOS switcher take over for the rest of this
     /// ⌘ hold. Only offered for sessions opened with ⌘Tab: the macOS switcher needs ⌘ alone, and
     /// replaying the keystroke needs ⌘Tab mode's Accessibility permission.
     private func handOffToSystemSwitcher() {
-        Log.session.notice("Hand-off to the macOS switcher requested")
+        // Claim the hand-off before closing, so no new PinTab session can start in between.
+        guard beginHandOff() else {
+            send(.cancel) // ⌘ already released, or the tap is gone: just close
+            return
+        }
+        Log.session.notice("Handing off to the macOS switcher")
         send(.cancel)
-        // Let the panel close (and, for S, the tap callback finish) before replaying ⌘Tab.
+        // Let the panel close (and a key's tap callback finish) before replaying ⌘Tab.
         DispatchQueue.main.async { [weak self] in
-            MainActor.assumeIsolated { self?.onHandOff() }
+            MainActor.assumeIsolated { self?.replayHandOff() }
         }
     }
 

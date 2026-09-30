@@ -157,7 +157,7 @@ struct SettingsView: View {
 
     private var shortcutHelp: String {
         if preferences.useCommandTab {
-            let other = preferences.shortcut.map { " \(KeyNames.display($0)) works the same way and needs no permission." } ?? ""
+            let other = preferences.shortcut.map { " \(KeyNames.display($0)) also opens the switcher and needs no permission, but can't hand over to the macOS switcher." } ?? ""
             return "Hold ⌘ and press Tab to open the switcher. Press Tab again to move right, add ⇧ to move left, and release ⌘ to switch. Press M or click ⋯ to edit pins, Esc, S or ⌘ to use the macOS switcher this once, P or ⏸ to pause PinTab, or . (period) to cancel." + other
         }
         guard let shortcut = preferences.shortcut else {
@@ -165,6 +165,6 @@ struct SettingsView: View {
         }
         let modifiers = shortcut.modifiers.symbols
         let key = KeyNames.name(for: shortcut.keyCode)
-        return "Hold \(modifiers) and press \(key) to open the switcher. Press \(key) again to move right, add ⇧ to move left, and release \(modifiers) to switch. Press M or click ⋯ to edit pins, or P or ⏸ to pause PinTab and use the macOS switcher."
+        return "Hold \(modifiers) and press \(key) to open the switcher. Press \(key) again to move right, add ⇧ to move left, and release \(modifiers) to switch. Press M or click ⋯ to edit pins, or P or ⏸ to pause PinTab until you resume it from the menu."
     }
 }

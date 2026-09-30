@@ -56,17 +56,17 @@ To pin the app you're using, choose **Pin “‹app›”** from the menu-bar ic
 | Release the modifier | Switch to the selected app |
 | Click an icon, or press Return | Switch immediately |
 | `.` (period) | Cancel without switching |
-| Esc | Cancel. In ⌘Tab mode, open the macOS switcher instead, like S |
+| Esc | Cancel. In a switcher opened with ⌘Tab, open the macOS switcher instead, like S (then Esc again cancels it) |
 | M, or click **⋯** | Open the pin editor |
-| S, or click **⌘** | Use the macOS switcher this time (⌘Tab mode only) |
-| P, or click **⏸** | Pause PinTab and hand over to the macOS switcher |
+| S, or click **⌘** | Use the macOS switcher this time (only in a switcher opened with ⌘Tab) |
+| P, or click **⏸** | Pause PinTab until you resume it from the menu |
 
 - **Quick tap.** Pressing and releasing the shortcut quickly switches to your previous pinned app without showing the panel. Tap again to flip back.
 - **Order.** Apps are listed most recently used first, starting from when PinTab launched. Starting from an app that isn't pinned, the first press selects your most recent pin.
 - **⌥⌘ shortcuts.** Cancel with `.` rather than Esc, because macOS reserves ⌥⌘Esc for Force Quit.
 - **What switching does.** Switching activates the app, like ⌘Tab. It doesn't reopen minimized windows, launch apps that aren't running, or change Spaces beyond what macOS does itself.
 - **Where the panel appears.** On the display that has the pointer.
-- **Pausing from the switcher.** Pausing closes the switcher without switching and stops PinTab listening for ⌘Tab and your shortcut. Keep holding ⌘ and press Tab again to get the macOS switcher. Choose **Resume PinTab** from the menu-bar icon to turn PinTab back on.
+- **Pausing from the switcher.** Pausing closes the switcher without switching and stops PinTab listening for ⌘Tab and your shortcut. In ⌘Tab mode, keep holding ⌘ and press Tab again to get the macOS switcher. Choose **Resume PinTab** from the menu-bar icon to turn PinTab back on.
 
 ## Pinning apps
 
@@ -92,7 +92,7 @@ Good to know:
 
 - **Your other shortcut keeps working.** A recorded shortcut such as ⌥⌘Tab needs no permission, so it still works even without Accessibility access.
 - **Secure text entry.** macOS hides keystrokes from event taps in password fields and when Terminal's Secure Keyboard Entry is on. There, ⌘Tab shows the macOS switcher until you leave the field.
-- **Using the macOS switcher just this once.** In PinTab's switcher, press Esc or S, or click **⌘**. PinTab closes its switcher and opens the macOS one, and you're still holding ⌘. Tap Tab and release as usual. Once you let go of ⌘, the next ⌘Tab is PinTab's again. This works only in ⌘Tab mode: the macOS switcher needs ⌘ alone, and opening it needs ⌘Tab mode's Accessibility permission.
+- **Using the macOS switcher just this once.** In PinTab's switcher, press Esc or S, or click **⌘**. PinTab closes its switcher and opens the macOS one, and you're still holding ⌘. Tap Tab and release as usual. Releasing ⌘ straight away switches to the macOS switcher's first choice, your previous app, like a quick ⌘Tab. To back out, press Esc again before releasing, or cancel PinTab's switcher with `.` instead. Once you let go of ⌘, the next ⌘Tab is PinTab's again. This works only when PinTab's switcher was opened with ⌘Tab, not with your other shortcut: the macOS switcher needs ⌘ alone, and opening it needs ⌘Tab mode's Accessibility permission.
 - **Getting the macOS switcher back for longer.** It's replaced while ⌘Tab mode is on. To bring it back until you resume, press P or click **⏸** in the switcher, or choose **Pause PinTab** from the menu.
 - **Each new version needs the permission again.** PinTab is signed ad hoc, so macOS treats every new build as a different app. If PinTab is listed as allowed but ⌘Tab opens the macOS switcher, select PinTab in the Accessibility list, remove it with **−**, then turn it on again.
 
