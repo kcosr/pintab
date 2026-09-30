@@ -430,7 +430,11 @@ final class SwitcherController: NSObject {
             return
         }
         switch keyCode {
-        case KeyCode.escape, KeyCode.period:
+        case KeyCode.escape:
+            // In a ⌘Tab session, Esc escapes to the macOS switcher for this hold (like S or the ⌘
+            // button); a second Esc then cancels that one. Elsewhere it simply cancels.
+            if model.canHandOff { handOffToSystemSwitcher() } else { send(.cancel) }
+        case KeyCode.period:
             send(.cancel)
         case KeyCode.leftArrow, KeyCode.upArrow:
             send(.step(forward: false))
