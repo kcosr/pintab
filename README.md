@@ -1,3 +1,7 @@
+# PinTab
+
+A ⌘Tab-style app switcher for macOS that shows only the apps you pin.
+
 <p align="center">
   <img src="assets/switcher.png" alt="The PinTab switcher: three pinned app icons in a glass panel over the desktop, with Sedes selected and its name shown below" width="440">
 </p>
@@ -5,10 +9,6 @@
 <p align="center">
   <img src="assets/pin-editor.png" alt="The Pinned Apps editor: running apps as tiles, with the pinned ones highlighted and marked with a filled pin" width="800">
 </p>
-
-# PinTab
-
-A ⌘Tab-style app switcher for macOS that shows only the apps you pin.
 
 Most of the time you move between a handful of apps. PinTab keeps only those in the switcher, most recently used first, so a quick tap always takes you back to the last one.
 
