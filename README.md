@@ -24,6 +24,7 @@ Other targets:
 | --- | --- |
 | `make test` | Run the PinTabCore test suite (swift-testing) |
 | `make app` | Build `build/PinTab.app` without installing |
+| `make dmg` | Build `build/PinTab-<version>-mac-<arch>.dmg`, a drag-to-Applications disk image |
 | `make run` | Build and launch `build/PinTab.app` |
 | `make logs` | Stream PinTab's log messages |
 | `make icon` | Regenerate `Support/AppIcon.icns` |

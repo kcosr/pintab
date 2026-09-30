@@ -5,6 +5,8 @@ BUNDLE_ID   := dev.local.PinTab
 VERSION     := 0.1.0
 BUILD_DIR   := build
 APP_BUNDLE  := $(BUILD_DIR)/$(APP_NAME).app
+ARCH        := $(shell uname -m)
+DMG         := $(BUILD_DIR)/$(APP_NAME)-$(VERSION)-mac-$(ARCH).dmg
 INSTALL_DIR := $(HOME)/Applications
 # "-" is an ad-hoc signature. Set SIGN_IDENTITY to a self-signed certificate name to keep a stable
 # identity across rebuilds (only matters if a privacy permission is ever required).
@@ -19,7 +21,7 @@ TEST_FLAGS := -Xswiftc -F -Xswiftc $(DEV_DIR)/Library/Developer/Frameworks \
               -Xlinker -rpath -Xlinker $(DEV_DIR)/Library/Developer/usr/lib
 endif
 
-.PHONY: all build release test app icon install uninstall run logs clean
+.PHONY: all build release test app dmg icon install uninstall run logs clean
 
 all: app
 
@@ -35,6 +37,9 @@ test:
 app: release
 	APP_NAME=$(APP_NAME) BUNDLE_ID=$(BUNDLE_ID) VERSION=$(VERSION) SIGN_IDENTITY="$(SIGN_IDENTITY)" \
 		scripts/make-app.sh "$$(swift build -c release --show-bin-path)/$(APP_NAME)" "$(APP_BUNDLE)"
+
+dmg: app
+	scripts/make-dmg.sh "$(APP_BUNDLE)" "$(DMG)" "$(APP_NAME)"
 
 icon:
 	swift scripts/make-icon.swift
