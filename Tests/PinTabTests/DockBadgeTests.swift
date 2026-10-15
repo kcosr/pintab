@@ -149,17 +149,18 @@ struct DockBadgeMonitorTests {
 
 @Suite("App badge preference")
 struct AppBadgePreferenceTests {
-    @Test func isOptionalAndPersistsWithoutEnablingCommandTab() {
+    @Test func defaultsOnAndPreservesExplicitOptOutWithoutEnablingCommandTab() {
         let name = "dev.local.PinTab.badge-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
         defer { defaults.removePersistentDomain(forName: name) }
         let preferences = Preferences(defaults: defaults)
-        #expect(!preferences.showAppBadges)
-        preferences.setShowAppBadges(true)
+        #expect(preferences.showAppBadges)
+        #expect(!preferences.useCommandTab)
+        preferences.setShowAppBadges(false)
         let restored = Preferences(defaults: defaults)
-        #expect(restored.showAppBadges)
+        #expect(!restored.showAppBadges)
         #expect(!restored.useCommandTab)
-        restored.setShowAppBadges(false)
-        #expect(!Preferences(defaults: defaults).showAppBadges)
+        restored.setShowAppBadges(true)
+        #expect(Preferences(defaults: defaults).showAppBadges)
     }
 }

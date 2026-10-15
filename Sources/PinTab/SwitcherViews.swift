@@ -269,7 +269,6 @@ private struct AppBadgeView: View {
             .frame(minWidth: 24, maxWidth: 56, minHeight: 24)
             .fixedSize()
             .background(Capsule().fill(Color(red: 0.88, green: 0.12, blue: 0.16)))
-            .overlay(Capsule().strokeBorder(.white.opacity(0.8), lineWidth: 1))
             .shadow(color: .black.opacity(0.2), radius: 1, y: 1)
             .allowsHitTesting(false)
             .accessibilityHidden(true)

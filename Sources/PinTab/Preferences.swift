@@ -22,6 +22,7 @@ final class Preferences {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        defaults.register(defaults: [Key.showAppBadges: true])
         pins = PreferencesCodec.decodePins(defaults.data(forKey: Key.pins))
         shortcut = PreferencesCodec.decodeShortcut(defaults.data(forKey: Key.shortcut))
         useCommandTab = defaults.bool(forKey: Key.useCommandTab)

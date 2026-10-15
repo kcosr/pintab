@@ -71,10 +71,10 @@ To pin the app you're using, choose **Pin “‹app›”** from the menu-bar ic
 
 ## App badges
 
-Turn on **Settings › General › Show app badges** to mirror each app’s Dock badge
-on its switcher icon. This is off by default and needs Accessibility permission,
-including when using a custom shortcut. If you already use ⌘Tab mode, it uses the
-same permission.
+**Settings › General › Show app badges** mirrors each app’s Dock badge on its
+switcher icon. It is on by default; a saved choice to turn it off is preserved.
+It needs Accessibility permission, including when using a custom shortcut.
+If you already use ⌘Tab mode, it uses the same permission.
 
 PinTab reads badge labels directly from the Dock; it does not capture screenshots
 or read notification contents. Counts, symbols and labels such as `99+` follow
