@@ -13,5 +13,7 @@ let package = Package(
             swiftSettings: [.defaultIsolation(MainActor.self)]
         ),
         .testTarget(name: "PinTabCoreTests", dependencies: ["PinTabCore"]),
+        .testTarget(name: "PinTabTests", dependencies: ["PinTab"],
+                    swiftSettings: [.defaultIsolation(MainActor.self)]),
     ]
 )

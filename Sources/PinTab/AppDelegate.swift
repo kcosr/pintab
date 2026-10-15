@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     private let eventTap = EventTap()
     private var statusItem: NSStatusItem?
     private var settingsWindow: NSWindow?
+    private var settingsPermissionTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let bundleID = Bundle.main.bundleIdentifier,
@@ -55,7 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             }
         } else if preferences.shortcut == nil && !preferences.useCommandTab {
             showSettings()
-        } else if preferences.useCommandTab && !EventTap.isTrusted {
+        } else if (preferences.useCommandTab || preferences.showAppBadges) && !EventTap.isTrusted {
             // A new build needs Accessibility permission again (ad-hoc signing changes its identity).
             // Prompting also re-adds PinTab to the Accessibility list after `make install` reset it.
             EventTap.requestTrust()
@@ -64,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        settingsPermissionTimer?.invalidate()
         switcher.closeAll()
         eventTap.disable(immediately: true)
         HotKeys.shared.unregister()
@@ -88,6 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     }
 
     private func refreshCommandTabState() {
+        state.accessibilityGranted = EventTap.isTrusted
         if !preferences.useCommandTab {
             state.commandTabStatus = .off
         } else if state.isPaused {
@@ -104,6 +107,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
         Log.app.notice("⌘Tab mode \(enabled ? "on" : "off", privacy: .public)")
         if enabled && !EventTap.isTrusted { EventTap.requestTrust() }
         applyCommandTab()
+    }
+
+    private func setShowAppBadges(_ enabled: Bool) {
+        preferences.setShowAppBadges(enabled)
+        if enabled && !EventTap.isTrusted { EventTap.requestTrust() }
+        refreshCommandTabState()
+        switcher.badgeSettingsChanged()
     }
 
     // MARK: Shortcut
@@ -291,6 +301,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
                 changeShortcut: { [weak self] in self?.changeShortcut($0) },
                 setPaused: { [weak self] in self?.setPaused($0) },
                 setUseCommandTab: { [weak self] in self?.setUseCommandTab($0) },
+                setShowAppBadges: { [weak self] in self?.setShowAppBadges($0) },
                 openAccessibilitySettings: { [weak self] in self?.askForAccessibility() },
                 setLaunchAtLogin: { [weak self] in self?.setLaunchAtLogin($0) },
                 managePins: { [weak self] in self?.switcher.openManage() }
@@ -305,12 +316,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             settingsWindow = window
         }
         state.loginItemStatus = SMAppService.mainApp.status
+        refreshCommandTabState()
+        settingsPermissionTimer?.invalidate()
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshCommandTabState() }
+        }
+        timer.tolerance = 0.15
+        RunLoop.main.add(timer, forMode: .common)
+        settingsPermissionTimer = timer
         NSApp.activate()
         settingsWindow?.makeKeyAndOrderFront(nil)
     }
 
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow, window === settingsWindow else { return }
+        settingsPermissionTimer?.invalidate()
+        settingsPermissionTimer = nil
         // Ends an in-progress recording through the recorder itself (resignFirstResponder → stop).
         window.makeFirstResponder(nil)
         if state.isRecordingShortcut { endRecording() }

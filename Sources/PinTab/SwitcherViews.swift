@@ -42,6 +42,7 @@ final class SwitcherViewModel {
         var isPinned: Bool
         var isRunning: Bool
         var canToggle: Bool
+        var badge: AppBadge?
     }
 
     var mode: Mode = .switching
@@ -227,6 +228,12 @@ private struct SwitchTile: View {
             .resizable()
             .interpolation(.high)
             .frame(width: Metrics.icon, height: Metrics.icon)
+            .overlay(alignment: .topTrailing) {
+                if let badge = tile.badge {
+                    AppBadgeView(badge: badge)
+                        .offset(x: 4, y: -2)
+                }
+            }
             .padding(Metrics.tilePadding)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -243,8 +250,29 @@ private struct SwitchTile: View {
             .onTapGesture { model.onClick(tile.id) }
             .accessibilityElement()
             .accessibilityLabel(tile.name)
+            .accessibilityValue(tile.badge.map { "Badge: \($0.text)" } ?? "")
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction { model.onClick(tile.id) }
+    }
+}
+
+private struct AppBadgeView: View {
+    let badge: AppBadge
+
+    var body: some View {
+        Text(badge.displayText)
+            .font(.system(size: 13, weight: .semibold, design: .rounded))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .padding(.horizontal, 6)
+            .frame(minWidth: 24, maxWidth: 56, minHeight: 24)
+            .fixedSize()
+            .background(Capsule().fill(Color(red: 0.88, green: 0.12, blue: 0.16)))
+            .overlay(Capsule().strokeBorder(.white.opacity(0.8), lineWidth: 1))
+            .shadow(color: .black.opacity(0.2), radius: 1, y: 1)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 }
 
