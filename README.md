@@ -15,6 +15,7 @@ Most of the time you move between a handful of apps. PinTab keeps only those in 
 - **Only your apps.** You choose which apps appear. A pinned app that isn't running is hidden, and comes back when it runs again.
 - **Works like ⌘Tab.** Hold the modifier and tap the key to cycle, add ⇧ to go back, and release to switch. The panel shows real app icons in a compact Liquid Glass panel.
 - **Your shortcut, or ⌘Tab itself.** Use a shortcut such as ⌥⌘Tab, which needs no special permissions. Or turn on ⌘Tab mode to replace the macOS switcher.
+- **App badges.** Optionally show each app’s Dock badge on its switcher icon.
 - **Small and private.** A menu-bar app with no network access, analytics or updater.
 
 Requires macOS 14 or later. It was developed on macOS 26; earlier versions are untested.
@@ -68,6 +69,22 @@ To pin the app you're using, choose **Pin “‹app›”** from the menu-bar ic
 - **Where the panel appears.** On the display that has the pointer.
 - **Pausing from the switcher.** Pausing closes the switcher without switching and stops PinTab listening for ⌘Tab and your shortcut. In ⌘Tab mode, keep holding ⌘ and press Tab again to get the macOS switcher. Choose **Resume PinTab** from the menu-bar icon to turn PinTab back on.
 
+## App badges
+
+**Settings › General › Show app badges** mirrors each app’s Dock badge on its
+switcher icon. It is on by default; a saved choice to turn it off is preserved.
+It needs Accessibility permission, including when using a custom shortcut.
+If you already use ⌘Tab mode, it uses the same permission.
+
+PinTab reads badge labels directly from the Dock; it does not capture screenshots
+or read notification contents. Counts, symbols and labels such as `99+` follow
+what each app exposes in the Dock. Apps without an available Dock badge show no badge.
+
+The switcher opens immediately. Badges appear when the background lookup finishes
+and refresh about once a second while it stays open. Closing the switcher clears
+the badge snapshot, so a new session does not show old cached counts. After an
+update, you may need to remove and re-add PinTab in Accessibility settings.
+
 ## Pinning apps
 
 To open the pin editor, use any of these:
@@ -102,7 +119,7 @@ The menu-bar icon is dimmed when PinTab is paused or no shortcut is working. It 
 
 - **Pin/Unpin “‹app›”** for the app you're using;
 - **Manage Pinned Apps…**;
-- **Settings…**: your shortcut, ⌘Tab mode, Pause and **Open at login**, which is off by default;
+- **Settings…**: your shortcut, ⌘Tab mode, app badges, Pause and **Open at login**, which is off by default;
 - **Pause PinTab** / **Resume PinTab**;
 - **Quit PinTab**.
 
@@ -118,8 +135,9 @@ A recorded shortcut must follow these rules:
 ## Privacy
 
 - **Nothing leaves your Mac.** PinTab makes no network connections and has no analytics, crash reporting or updater.
-- **What it stores:** your pinned apps (bundle identifiers and names), your shortcut, and whether ⌘Tab mode is on. These live in the `dev.local.PinTab` defaults domain.
-- **Without ⌘Tab mode** it needs no special permissions. It registers one keyboard shortcut and can't see any other keystrokes.
+- **What it stores:** your pinned apps (bundle identifiers and names), your shortcut, and whether ⌘Tab mode and app badges are on. These live in the `dev.local.PinTab` defaults domain.
+- **Without ⌘Tab mode or app badges** it needs no special permissions. It registers one keyboard shortcut and can't see any other keystrokes.
+- **With app badges** it reads the Dock’s badge labels while the switcher is open. Badge values are not stored or logged.
 - **With ⌘Tab mode** it acts only on ⌘Tab and on keys pressed while its switcher is open. It never records or logs typing. The only keystroke it ever sends is a ⌘Tab that opens the macOS switcher, and only when you ask for it with Esc, S or **⌘**.
 
 ## Troubleshooting

@@ -2,13 +2,14 @@ import Foundation
 import Observation
 import PinTabCore
 
-/// Durable settings: pinned app identities, the switcher shortcut and whether ⌘Tab mode is on.
+/// Durable settings: pinned app identities, shortcuts and optional switcher features.
 @Observable
 final class Preferences {
     private enum Key {
         static let pins = "pins"
         static let shortcut = "shortcut"
         static let useCommandTab = "useCommandTab"
+        static let showAppBadges = "showAppBadges"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -16,17 +17,26 @@ final class Preferences {
     private(set) var shortcut: Shortcut?
     /// Take over ⌘Tab through an event tap (needs Accessibility permission).
     private(set) var useCommandTab: Bool
+    /// Mirror Dock badges in the switcher (needs Accessibility permission).
+    private(set) var showAppBadges: Bool
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        defaults.register(defaults: [Key.showAppBadges: true])
         pins = PreferencesCodec.decodePins(defaults.data(forKey: Key.pins))
         shortcut = PreferencesCodec.decodeShortcut(defaults.data(forKey: Key.shortcut))
         useCommandTab = defaults.bool(forKey: Key.useCommandTab)
+        showAppBadges = defaults.bool(forKey: Key.showAppBadges)
     }
 
     func setUseCommandTab(_ enabled: Bool) {
         useCommandTab = enabled
         defaults.set(enabled, forKey: Key.useCommandTab)
+    }
+
+    func setShowAppBadges(_ enabled: Bool) {
+        showAppBadges = enabled
+        defaults.set(enabled, forKey: Key.showAppBadges)
     }
 
     func setPinned(_ id: AppID, name: String, pinned: Bool) {

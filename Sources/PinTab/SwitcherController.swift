@@ -9,6 +9,7 @@ final class SwitcherController: NSObject {
     private let apps: RunningApps
     private let activator: Activator
     private let model = SwitcherViewModel()
+    private let badges = DockBadgeMonitor()
     private lazy var panel = SwitcherPanel(model: model)
 
     private var isPresented = false
@@ -39,6 +40,7 @@ final class SwitcherController: NSObject {
         self.apps = apps
         self.activator = activator
         super.init()
+        badges.onChange = { [weak self] in self?.updateBadges() }
         // Panel callbacks are ignored once the panel is dismissed, so a click queued behind a
         // modifier release cannot reopen anything after the switch committed.
         model.onPoint = { [weak self] id in self?.pointed(at: id) }
@@ -160,6 +162,12 @@ final class SwitcherController: NSObject {
         if isActive { send(.cancel) }
     }
 
+    func badgeSettingsChanged() {
+        guard isPresented else { return }
+        updateBadgeMonitoring()
+        updateBadges()
+    }
+
     /// Development aid (`open PinTab.app --args -PinTabPreview switching|managing`): shows a panel
     /// for a few seconds without keyboard input so its layout can be inspected. Nothing is activated.
     func showPreview(_ mode: String, seconds: TimeInterval = 6) {
@@ -250,6 +258,7 @@ final class SwitcherController: NSObject {
     private func dismiss() {
         guard isPresented else { return }
         isPresented = false
+        badges.stop()
         revealToken += 1
         stopPolling()
         removeMonitors()
@@ -304,11 +313,33 @@ final class SwitcherController: NSObject {
                 : nil
         }
         computeMetrics()
+        updateBadgeMonitoring()
     }
 
     private func tile(for id: AppID, pinned: Bool, running: Bool, canToggle: Bool) -> SwitcherViewModel.Tile {
         SwitcherViewModel.Tile(id: id, name: apps.name(for: id, fallback: preferences.pins.name(of: id)),
-                               icon: apps.icon(for: id), isPinned: pinned, isRunning: running, canToggle: canToggle)
+                               icon: apps.icon(for: id), isPinned: pinned, isRunning: running, canToggle: canToggle,
+                               badge: preferences.showAppBadges ? badges.badges[id] : nil)
+    }
+
+    private func updateBadgeMonitoring() {
+        guard isPresented, preferences.showAppBadges, model.mode == .switching else {
+            badges.stop()
+            return
+        }
+        var targets: [AppID: URL] = [:]
+        for tile in model.tiles {
+            if let url = apps.instance(for: tile.id)?.bundleURL { targets[tile.id] = url }
+        }
+        badges.start(apps: targets)
+    }
+
+    private func updateBadges() {
+        guard isPresented else { return }
+        for index in model.tiles.indices {
+            model.tiles[index].badge = preferences.showAppBadges && model.mode == .switching
+                ? badges.badges[model.tiles[index].id] : nil
+        }
     }
 
     private func computeMetrics() {

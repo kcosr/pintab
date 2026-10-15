@@ -14,6 +14,7 @@ enum CommandTabStatus {
 @Observable
 final class AppState {
     var commandTabStatus: CommandTabStatus = .off
+    var accessibilityGranted = false
     var isPaused = false
     var isRecordingShortcut = false
     /// Why the saved shortcut is not currently registered, if it failed.
@@ -30,6 +31,7 @@ struct SettingsActions: Sendable {
     var changeShortcut: @MainActor @Sendable (Shortcut) -> String?
     var setPaused: @MainActor @Sendable (Bool) -> Void
     var setUseCommandTab: @MainActor @Sendable (Bool) -> Void
+    var setShowAppBadges: @MainActor @Sendable (Bool) -> Void
     var openAccessibilitySettings: @MainActor @Sendable () -> Void
     var setLaunchAtLogin: @MainActor @Sendable (Bool) -> Void
     var managePins: @MainActor @Sendable () -> Void
@@ -86,6 +88,21 @@ struct SettingsView: View {
             }
 
             Section("General") {
+                Toggle(isOn: Binding(get: { preferences.showAppBadges }, set: { actions.setShowAppBadges($0) })) {
+                    Text("Show app badges")
+                    Text("Shows each app’s Dock badge on its switcher icon. Needs Accessibility permission.")
+                }
+                if preferences.showAppBadges && !state.accessibilityGranted {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Allow Accessibility access to show app badges.", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text("If PinTab is already allowed after an update, remove it with − and turn it on again.")
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button("Open Accessibility Settings", action: actions.openAccessibilitySettings)
+                    }
+                    .font(.callout)
+                }
                 Toggle("Pause PinTab", isOn: Binding(get: { state.isPaused }, set: { actions.setPaused($0) }))
                 Toggle("Open at login", isOn: Binding(
                     get: { state.loginItemStatus == .enabled || state.loginItemStatus == .requiresApproval },
@@ -110,8 +127,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: 480, height: min(760, (NSScreen.main?.visibleFrame.height ?? 860) - 100))
     }
 
     @ViewBuilder
@@ -140,9 +156,15 @@ struct SettingsView: View {
     }
 
     private var privacyText: String {
-        let base = "PinTab makes no network connections and stores only your pinned apps and shortcut settings."
+        let base = "PinTab makes no network connections and stores only your pinned apps and switcher settings."
+        let badges = preferences.showAppBadges
+            ? " App badges use Accessibility permission to read badge labels from the Dock while the switcher is open. Badge values are not stored."
+            : ""
         if preferences.useCommandTab {
-            return "⌘Tab mode uses Accessibility permission to intercept ⌘Tab before macOS does. PinTab acts only on ⌘Tab and on keys pressed while its switcher is open, and never records or logs typing. " + base
+            return "⌘Tab mode uses Accessibility permission to intercept ⌘Tab before macOS does. PinTab acts only on ⌘Tab and on keys pressed while its switcher is open, and never records or logs typing." + badges + " " + base
+        }
+        if preferences.showAppBadges {
+            return "PinTab registers your shortcut and does not read other keystrokes." + badges + " " + base
         }
         return "PinTab needs no special permissions. It registers one keyboard shortcut and does not read other keystrokes. " + base
     }
